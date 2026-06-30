@@ -3,9 +3,9 @@ import type { ApiClient } from "@/lib/auth";
 import { getSupabaseClient } from "@/lib/supabase";
 
 export type CreateBillingInput = {
-  tenant?: {
-    id?: string;
-    name?: string;
+  store: {
+    id: string;
+    name: string;
     document?: string;
   };
   customerId?: string;
@@ -37,20 +37,20 @@ export function validateCreateBillingInput(body: unknown): CreateBillingInput {
 
   const input = body as Partial<CreateBillingInput>;
 
-  if (input.tenant && typeof input.tenant !== "object") {
-    throw new Error("tenant must be an object when provided.");
+  if (!input.store || typeof input.store !== "object") {
+    throw new Error("store is required.");
   }
 
-  if (input.tenant?.id !== undefined && typeof input.tenant.id !== "string") {
-    throw new Error("tenant.id must be a string when provided.");
+  if (typeof input.store.id !== "string" || !input.store.id.trim()) {
+    throw new Error("store.id is required.");
   }
 
-  if (input.tenant?.name !== undefined && typeof input.tenant.name !== "string") {
-    throw new Error("tenant.name must be a string when provided.");
+  if (typeof input.store.name !== "string" || !input.store.name.trim()) {
+    throw new Error("store.name is required.");
   }
 
-  if (input.tenant?.document !== undefined && typeof input.tenant.document !== "string") {
-    throw new Error("tenant.document must be a string when provided.");
+  if (input.store.document !== undefined && typeof input.store.document !== "string") {
+    throw new Error("store.document must be a string when provided.");
   }
 
   if (!input.customerId && !input.customer) {
@@ -82,9 +82,9 @@ export async function createBillingForClient(client: ApiClient, input: CreateBil
 
   const billingRow = {
     client_id: client.id,
-    tenant_id: input.tenant?.id ?? null,
-    tenant_name: input.tenant?.name ?? null,
-    tenant_document: input.tenant?.document ?? null,
+    store_id: input.store.id,
+    store_name: input.store.name,
+    store_document: input.store.document ?? null,
     asaas_payment_id: asaasBilling.id,
     external_reference: input.externalReference ?? null,
     status: asaasBilling.status,
