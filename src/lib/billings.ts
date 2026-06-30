@@ -3,6 +3,11 @@ import type { ApiClient } from "@/lib/auth";
 import { getSupabaseClient } from "@/lib/supabase";
 
 export type CreateBillingInput = {
+  tenant?: {
+    id?: string;
+    name?: string;
+    document?: string;
+  };
   customerId?: string;
   customer?: {
     name: string;
@@ -31,6 +36,22 @@ export function validateCreateBillingInput(body: unknown): CreateBillingInput {
   }
 
   const input = body as Partial<CreateBillingInput>;
+
+  if (input.tenant && typeof input.tenant !== "object") {
+    throw new Error("tenant must be an object when provided.");
+  }
+
+  if (input.tenant?.id !== undefined && typeof input.tenant.id !== "string") {
+    throw new Error("tenant.id must be a string when provided.");
+  }
+
+  if (input.tenant?.name !== undefined && typeof input.tenant.name !== "string") {
+    throw new Error("tenant.name must be a string when provided.");
+  }
+
+  if (input.tenant?.document !== undefined && typeof input.tenant.document !== "string") {
+    throw new Error("tenant.document must be a string when provided.");
+  }
 
   if (!input.customerId && !input.customer) {
     throw new Error("Provide customerId or customer.");
@@ -61,6 +82,9 @@ export async function createBillingForClient(client: ApiClient, input: CreateBil
 
   const billingRow = {
     client_id: client.id,
+    tenant_id: input.tenant?.id ?? null,
+    tenant_name: input.tenant?.name ?? null,
+    tenant_document: input.tenant?.document ?? null,
     asaas_payment_id: asaasBilling.id,
     external_reference: input.externalReference ?? null,
     status: asaasBilling.status,

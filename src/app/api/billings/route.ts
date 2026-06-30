@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       message.includes("Request body") ||
       message.includes("Provide customerId") ||
       message.includes("billingType") ||
+      message.includes("tenant.") ||
       message.includes("amount") ||
       message.includes("dueDate") ||
       message.includes("customer.name")
