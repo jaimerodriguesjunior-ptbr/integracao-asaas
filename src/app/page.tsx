@@ -5,12 +5,12 @@ import { createApiClient, listClientStoreEvents } from "@/lib/store-billing";
 import {
   calculateStoreBillingSnapshotWithPayment,
   getClientStoreById,
+  getGatewayPixSettings,
   listApiClients,
-  listApiClientPixSettings,
   listClientStores,
   markStorePaidOneMonth,
   releaseStoreForThreeDays,
-  upsertApiClientPixSettings,
+  upsertGatewayPixSettings,
   upsertClientStoreByClientId
 } from "@/lib/store-billing";
 
@@ -92,17 +92,15 @@ async function saveProgram(formData: FormData) {
 async function savePixSettings(formData: FormData) {
   "use server";
 
-  const clientId = formString(formData, "client_id");
   const pixKey = formString(formData, "pix_key");
   const merchantName = formString(formData, "merchant_name");
   const merchantCity = formString(formData, "merchant_city");
 
-  if (!clientId || !pixKey || !merchantName || !merchantCity) {
+  if (!pixKey || !merchantName || !merchantCity) {
     return;
   }
 
-  await upsertApiClientPixSettings({
-    clientId,
+  await upsertGatewayPixSettings({
     pixKey,
     merchantName,
     merchantCity,
@@ -198,10 +196,9 @@ function Field(props: {
 }
 
 export default async function HomePage() {
-  const [clients, stores, pixSettings] = await Promise.all([listApiClients(), listClientStores(), listApiClientPixSettings()]);
+  const [clients, stores, pixSettings] = await Promise.all([listApiClients(), listClientStores(), getGatewayPixSettings()]);
   const events = await listClientStoreEvents((stores as StoreWithClient[]).map((store) => store.id));
   const eventsByStoreId = new Map<string, typeof events>();
-  const pixSettingsByClientId = new Map(pixSettings.map((settings) => [settings.client_id, settings]));
 
   for (const event of events) {
     const current = eventsByStoreId.get(event.client_store_id) ?? [];
@@ -345,7 +342,7 @@ export default async function HomePage() {
               padding: 18
             }}
           >
-            Pix por programa
+            PIX
           </summary>
           <form
             action={savePixSettings}
@@ -358,44 +355,55 @@ export default async function HomePage() {
             }}
           >
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-              <label style={{ display: "grid", gap: 5, fontSize: 13, minWidth: 0, color: "#57534e" }}>
-                <span>Programa</span>
-                <select name="client_id" required style={inputStyle()}>
-                  <option value="">Selecione</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name} ({client.client_key})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Field label="Chave Pix" name="pix_key" />
-              <Field label="Nome do recebedor" name="merchant_name" />
-              <Field label="Cidade do recebedor" name="merchant_city" />
-              <Field label="Prefixo TXID" name="txid_prefix" defaultValue="MENSAL" />
+              <Field label="Chave Pix" name="pix_key" defaultValue={pixSettings?.pix_key} />
+              <Field label="Nome do recebedor" name="merchant_name" defaultValue={pixSettings?.merchant_name} />
+              <Field label="Cidade do recebedor" name="merchant_city" defaultValue={pixSettings?.merchant_city} />
+              <Field label="Prefixo TXID" name="txid_prefix" defaultValue={pixSettings?.txid_prefix ?? "MENSAL"} />
             </div>
-            <Field label="Descricao no Pix" name="description" defaultValue="Mensalidade do sistema" />
+            <Field label="Descricao no Pix" name="description" defaultValue={pixSettings?.description ?? "Mensalidade do sistema"} />
             <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 16 }}>
               <label style={{ alignItems: "center", display: "flex", gap: 8 }}>
-                <input name="active" type="checkbox" defaultChecked />
+                <input name="active" type="checkbox" defaultChecked={pixSettings?.active ?? true} />
                 Pix ativo
               </label>
               <button style={secondaryButtonStyle} type="submit">
                 Salvar Pix
               </button>
             </div>
-            {clients.length ? (
-              <div style={{ color: "#57534e", display: "grid", fontSize: 13, gap: 6 }}>
-                {clients.map((client) => {
-                  const settings = pixSettingsByClientId.get(client.id);
-                  return (
-                    <div key={client.id}>
-                      <strong>{client.name}</strong>: {settings?.active ? `${settings.merchant_name} - ${settings.merchant_city}` : "Pix nao configurado"}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+            <div
+              style={{
+                background: "#f8f5ef",
+                border: "1px solid #ece7df",
+                borderRadius: 6,
+                color: "#57534e",
+                display: "grid",
+                fontSize: 13,
+                gap: 6,
+                padding: 12
+              }}
+            >
+              {pixSettings ? (
+                <>
+                  <div>
+                    <strong>Status:</strong> {pixSettings.active ? "Ativo" : "Inativo"}
+                  </div>
+                  <div>
+                    <strong>Recebedor:</strong> {pixSettings.merchant_name} - {pixSettings.merchant_city}
+                  </div>
+                  <div>
+                    <strong>Chave:</strong> {pixSettings.pix_key}
+                  </div>
+                  <div>
+                    <strong>Descricao:</strong> {pixSettings.description ?? "sem descricao"}
+                  </div>
+                  <div>
+                    <strong>TXID:</strong> {pixSettings.txid_prefix ?? "sem prefixo"}
+                  </div>
+                </>
+              ) : (
+                <div>Pix ainda nao configurado.</div>
+              )}
+            </div>
           </form>
         </details>
 

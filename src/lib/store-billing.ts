@@ -67,15 +67,13 @@ type StoreUpsertInput = {
   active?: boolean;
 };
 
-export type ApiClientPixSettings = PixSettings & {
+export type GatewayPixSettings = PixSettings & {
   id: string;
-  client_id: string;
   created_at: string;
   updated_at: string;
 };
 
 type PixSettingsUpsertInput = {
-  clientId: string;
   pixKey: string;
   merchantName: string;
   merchantCity: string;
@@ -166,22 +164,17 @@ export function calculateStoreBillingSnapshot(store: ClientStore): StoreBillingS
 }
 
 export async function enrichStoreBillingSnapshotWithPayment(snapshot: StoreBillingSnapshot) {
-  if (snapshot.store.payment_copy_paste && snapshot.store.payment_qr_code) {
-    return snapshot;
-  }
-
-  const pixSettings = await getApiClientPixSettings(snapshot.store.client_id);
+  const pixSettings = await getGatewayPixSettings();
   const copyPaste =
-    snapshot.store.payment_copy_paste ||
-    (pixSettings
+    pixSettings
       ? buildPixCopyPaste({
           settings: pixSettings,
           amount: Number(snapshot.store.monthly_amount || 0),
           storeId: snapshot.store.store_id
         })
-      : null);
+      : snapshot.store.payment_copy_paste;
 
-  const qrCode = snapshot.store.payment_qr_code || (await buildPixQrCodeDataUrl(copyPaste));
+  const qrCode = pixSettings ? await buildPixQrCodeDataUrl(copyPaste) : snapshot.store.payment_qr_code;
 
   return {
     ...snapshot,
@@ -226,57 +219,72 @@ export async function listApiClients() {
   return data ?? [];
 }
 
-export async function listApiClientPixSettings() {
+export async function getGatewayPixSettings() {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from("api_client_pix_settings")
+    .from("gateway_pix_settings")
     .select("*")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    throw new Error(`Failed to list Pix settings: ${error.message}`);
-  }
-
-  return (data ?? []) as ApiClientPixSettings[];
-}
-
-export async function getApiClientPixSettings(clientId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("api_client_pix_settings")
-    .select("*")
-    .eq("client_id", clientId)
     .eq("active", true)
-    .maybeSingle<ApiClientPixSettings>();
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<GatewayPixSettings>();
 
   if (error) {
+    if (
+      error.message.includes("gateway_pix_settings") ||
+      error.message.includes("schema cache") ||
+      error.code === "PGRST205"
+    ) {
+      return null;
+    }
+
     throw new Error(`Failed to load Pix settings: ${error.message}`);
   }
 
   return data;
 }
 
-export async function upsertApiClientPixSettings(input: PixSettingsUpsertInput) {
+export async function upsertGatewayPixSettings(input: PixSettingsUpsertInput) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("api_client_pix_settings")
-    .upsert(
-      {
-        client_id: input.clientId,
-        pix_key: input.pixKey,
-        merchant_name: input.merchantName,
-        merchant_city: input.merchantCity,
-        description: input.description ?? null,
-        txid_prefix: input.txidPrefix ?? null,
-        active: input.active ?? true
-      },
-      { onConflict: "client_id" }
-    )
-    .select("*")
-    .single<ApiClientPixSettings>();
+
+  const { data: current, error: currentError } = await supabase
+    .from("gateway_pix_settings")
+    .select("id")
+    .eq("active", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (currentError) {
+    throw new Error(`Failed to load current Pix settings: ${currentError.message}`);
+  }
+
+  const payload = {
+    pix_key: input.pixKey,
+    merchant_name: input.merchantName,
+    merchant_city: input.merchantCity,
+    description: input.description ?? null,
+    txid_prefix: input.txidPrefix ?? null,
+    active: input.active ?? true
+  };
+
+  const query = current
+    ? supabase.from("gateway_pix_settings").update(payload).eq("id", current.id)
+    : supabase.from("gateway_pix_settings").insert(payload);
+
+  const { data, error } = await query.select("*").single<GatewayPixSettings>();
 
   if (error) {
     throw new Error(`Failed to save Pix settings: ${error.message}`);
+  }
+
+  const { error: clearPaymentError } = await supabase.from("client_stores").update({
+    payment_copy_paste: null,
+    payment_qr_code: null
+  }).neq("id", "00000000-0000-0000-0000-000000000000");
+
+  if (clearPaymentError) {
+    throw new Error(`Failed to clear cached Pix data: ${clearPaymentError.message}`);
   }
 
   return data;

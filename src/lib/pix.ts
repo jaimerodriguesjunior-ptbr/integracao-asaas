@@ -13,12 +13,36 @@ function onlyAscii(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function limit(value: string, maxLength: number) {
   return onlyAscii(value).slice(0, maxLength);
+}
+
+function normalizePixKey(value: string) {
+  const trimmed = value.trim();
+
+  if (trimmed.includes("@")) return trimmed;
+  if (trimmed.length > 30 && trimmed.includes("-")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
+
+  if (trimmed.startsWith("+")) {
+    return `+${digits}`;
+  }
+
+  if (digits.length === 13 && digits.startsWith("55")) {
+    return `+${digits}`;
+  }
+
+  if (/^\d{2}9\d{8}$/.test(digits) || /^\d{2}[2-5]\d{7}$/.test(digits)) {
+    return `+55${digits}`;
+  }
+
+  return trimmed.replace(/[^a-zA-Z0-9]/g, "");
 }
 
 function emv(id: string, value: string) {
@@ -59,8 +83,7 @@ export function buildPixCopyPaste(params: {
 
   const merchantAccountInfo = [
     emv("00", "BR.GOV.BCB.PIX"),
-    emv("01", limit(params.settings.pix_key, 77)),
-    params.settings.description ? emv("02", limit(params.settings.description, 72)) : ""
+    emv("01", normalizePixKey(params.settings.pix_key).slice(0, 77))
   ].join("");
 
   const additionalData = emv("05", buildTxid(params.settings, params.storeId));
@@ -71,7 +94,7 @@ export function buildPixCopyPaste(params: {
     emv("53", "986"),
     emv("54", amount.toFixed(2)),
     emv("58", "BR"),
-    emv("59", limit(params.settings.merchant_name, 25)),
+    emv("59", limit(params.settings.merchant_name, 25).toUpperCase()),
     emv("60", limit(params.settings.merchant_city, 15).toUpperCase()),
     emv("62", additionalData)
   ].join("");
