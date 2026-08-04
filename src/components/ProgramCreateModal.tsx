@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type ProgramCreateModalProps = {
   action: (formData: FormData) => Promise<void>;
@@ -8,6 +9,11 @@ type ProgramCreateModalProps = {
 
 export function ProgramCreateModal({ action }: ProgramCreateModalProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -33,7 +39,8 @@ export function ProgramCreateModal({ action }: ProgramCreateModalProps) {
         +
       </button>
 
-      {open ? (
+      {open && mounted
+        ? createPortal(
         <div
           style={{
             alignItems: "center",
@@ -113,8 +120,10 @@ export function ProgramCreateModal({ action }: ProgramCreateModalProps) {
               </div>
             </form>
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }
