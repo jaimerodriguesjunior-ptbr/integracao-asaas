@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 
 import { ProgramCreateModal } from "@/components/ProgramCreateModal";
+import { PwaClient } from "@/components/PwaClient";
 import { createApiClient, listClientStoreEvents } from "@/lib/store-billing";
 import {
   calculateStoreBillingSnapshotWithPayment,
@@ -221,6 +222,7 @@ export default async function HomePage() {
         padding: 28
       }}
     >
+      <PwaClient />
       <section style={{ boxSizing: "border-box", margin: "0 auto", maxWidth: 1180, width: "100%" }}>
         <header
           style={{

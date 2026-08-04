@@ -1,0 +1,18 @@
+{
+  "name": "Nuvem Local Cobrança",
+  "short_name": "Cobrança",
+  "description": "Controle de recebimentos e mensalidades.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f4ef",
+  "theme_color": "#12392b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
