@@ -144,7 +144,7 @@ export function calculateStoreBillingSnapshot(store: ClientStore): StoreBillingS
 
   const daysPastDue = paidUntil ? Math.max(0, Math.floor((now.getTime() - paidUntil.getTime()) / DAY_IN_MS)) : 0;
   const daysUntilDue = paidUntil && paidIsValid ? Math.floor((paidUntil.getTime() - now.getTime()) / DAY_IN_MS) : null;
-  const paymentDueSoon = status === "ativo" && (daysUntilDue === 2 || daysUntilDue === 0);
+  const paymentDueSoon = status === "ativo" && daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 2;
   const shouldBlockNewOperations = status === "bloqueado";
 
   return {
